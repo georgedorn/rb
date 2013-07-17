@@ -1,0 +1,135 @@
+{% load song_stars %}
+<html>
+	<head>
+		<title>Rock Band Track List</title>
+		<script type="text/javascript" src="/rb/media/jquery-1.3.2.min.js"></script> 
+		<script type="text/javascript" src="/rb/media/dataTables/js/jquery.dataTables.js"></script>
+		<script type="text/javascript">
+var filter_owned = false;
+var enable_filter_owned = {% if user.is_authenticated %} true {% else %} false {% endif %};
+if (enable_filter_owned) {
+    $.fn.dataTableExt.afnFiltering.push(function(oSettings, aData, iDataIndex){
+        if (filter_owned == 'all') {
+            return true;
+        }
+        if (filter_owned == 'owned' && aData[0].indexOf('False') != -1) {
+            return false;
+        }
+        else 
+            if (filter_owned == 'unowned' && aData[0].indexOf('True') != -1) {
+                return false;
+            }
+        return true;
+    });
+}
+
+oTable = null;
+$(document).ready(function(){
+    oTable = $('#songlist').dataTable({
+	"sPaginationType": "full_numbers",
+    "bProcessing": true,
+    "bSortClasses": false,
+    {% if user.is_authenticated %}
+    "bStateSave": true
+    {% endif %}
+    });
+
+    if (enable_filter_owned) {
+        //create a checkbox for filtering stuff you own
+        var filter_owned_select = $("<select name='filter_owned'><option value='all'>All<option value='owned'>Owned<option value='unowned'>Unowned</select>").attr('id', 'filter_owned');
+        $('#songlist_filter').after(filter_owned_select);
+        filter_owned_select.before("<span>Filter: </span>");
+    
+        filter_owned_select.bind('change', function(){
+            old_value = filter_owned;
+            filter_owned = this.value;
+            if (old_value != filter_owned) {
+                oTable.fnDraw();
+            }
+        });
+    }
+
+});
+
+var own_url_proto = "{% url mark_ownership 90909090909090 8 %}";
+var update_ownership = function(song, own){
+    url = own_url_proto.replace('8',own).replace('90909090909090', song);
+    var result = $.getJSON(url, 
+        function(data){
+            var newa_string = '<a href="'+data.url+'" id="own_'+data.song.id+'">';
+            if (data.song.owned){
+                newa_string += "False";
+                var new_owned_int = 0; //value to switch to when clicked again
+            } else {
+                newa_string += "True";
+                var new_owned_int = 1;
+            }
+            newa_string += "</a>";
+            var newa = $(newa_string);
+            $('#own_'+data.song.id).replaceWith(newa); 
+            $('#own_'+data.song.id).bind('click',function(){update_ownership(data.song.id, new_owned_int); return false;});
+          //  oTable.fnDraw();           
+        }
+    );
+}
+
+ 		</script>
+	<style type="text/css" title="currentStyle">
+		@import "/rb/media/dataTables/css/demo_page.css";
+		@import "/rb/media/dataTables/css/demo_table.css";
+        @import "/rb/media/songlist.css";
+	</style>
+	</head>
+	
+	<body>
+		<table id="songlist" class="display">
+			<thead>
+				<tr>
+				    {% if user.is_authenticated %}
+				    <th>Owned</th>
+                    {% endif %}
+					<th>Song</th>
+					<th>Band</th>
+					<th>Year</th>
+					<th>Released</th>
+					<th>Band</th>
+					<th>Guitar</th>
+					<th>Bass</th>
+					<th>Vocals</th>
+					<th>Drums</th>
+					<th>Source</th>
+<!--					<th>Buy it</th> -->
+				</tr>
+			</thead>
+			<tbody>
+		{% for song in songlist %}
+			<tr>{% if user.is_authenticated %}<td>
+			     {% if song.owned %}
+                    <a id="own_{{song.id}}" href="{%url mark_ownership song.id 0 %}" onclick="update_ownership({{song.id}},0);return false;">True</a>
+                 {% else %}
+                    <a id="own_{{song.id}}" href="{%url mark_ownership song.id 1 %}" onclick="update_ownership({{song.id}},1);return false;">False</a>
+                 {% endif %} </td>
+                {% endif %}
+				<td class="song_text">{{ song.name }}</td>
+				<td class="song_text">{{ song.band }}</td>
+				<td class="song_text">{{ song.year }}</td>
+				<td class="song_text">{{ song.release }}</td>
+				<td>{{ song.band_diff|stars }}</td>
+				<td>{{ song.guitar_diff|stars }}</td>
+				<td>{{ song.bass_diff|stars }}</td>
+				<td>{{ song.vocals_diff|stars }}</td>
+				<td>{{ song.drums_diff|stars }}</td>
+				<td class="song_text">{{ song.source }}</td>
+<!--				<td>&nbsp;</td> -->
+			</tr>
+		{% endfor %}
+			</tbody>
+		</table>
+        {% if user.is_authenticated %}
+        Hi, {{user}}.  <a href="{%url logout %}?next_page={%url songlist%}"> Logout</a>
+        {% else %}
+        <a href="{%url login %}">Login</a>
+        {% endif %}
+	</body>
+	
+</html>
